@@ -1,0 +1,1 @@
+window.ER_SUPABASE_CONFIG = window.ER_SUPABASE_CONFIG || null;
