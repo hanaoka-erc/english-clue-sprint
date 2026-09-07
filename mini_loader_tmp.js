@@ -1,0 +1,1 @@
+document.write('<script src="mini_puzzles_batch2_original.js"><\/script>');document.write('<script src="mini_puzzles_batch3.js"><\/script>');document.write('<script src="mini_grid_ui.js"><\/script>');
