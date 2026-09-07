@@ -1,1 +1,7 @@
-window.ER_SUPABASE_CONFIG = window.ER_SUPABASE_CONFIG || null;
+(()=>{
+const endpoint='https://tftltvscewhedrgvwqlt.supabase.co/functions/v1/daily-leaderboard';
+window.ER_SUPABASE_CONFIG={url:'edge',anonKey:'public'};
+const idKey='erc_leaderboard_client_id_v1';let uid=localStorage.getItem(idKey);if(!uid){uid=(crypto.randomUUID?crypto.randomUUID():'u-'+Date.now()+'-'+Math.random().toString(36).slice(2));localStorage.setItem(idKey,uid)}
+function from(){let mode='select',payload=null,date=null;const api={insert(v){mode='insert';payload=v;return api},select(){mode='select';return api},eq(k,v){if(k==='daily_date')date=v;return api},order(){return api},then(resolve,reject){const run=async()=>{if(mode==='insert'){const r=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});const j=await r.json();return r.ok?{data:j,error:null}:{data:null,error:j}}const r=await fetch(endpoint+'?date='+encodeURIComponent(date||''));const j=await r.json();return r.ok?{data:j.rows||[],error:null}:{data:null,error:j}};run().then(resolve,reject)}};return api}
+window.supabase={createClient:()=>({auth:{getSession:async()=>({data:{session:{user:{id:uid}}},error:null}),getUser:async()=>({data:{user:{id:uid}},error:null}),signInAnonymously:async()=>({data:{user:{id:uid}},error:null})},from})};
+})();
