@@ -1,0 +1,1 @@
+BANK.push(...[{"id":"placeholder","cat":"Temporary","q":"placeholder","a":"placeholder","w":["x","y","z"],"target":"placeholder","trap":"placeholder"}]);
