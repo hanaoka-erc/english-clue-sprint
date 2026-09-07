@@ -1,1 +1,1 @@
-document.write('<script src="questions_batch6_original.js"><\/script>');document.write('<script src="questions_batch7.js"><\/script>');
+document.write('<script src="questions_batch6_original.js"><\/script>');document.write('<script src="questions_batch7.js"><\/script>');document.addEventListener('DOMContentLoaded',()=>{const f=document.querySelector('footer');if(f)f.textContent='English Clue Sprint v1.7 — 250 clues + 40 Mini Puzzles';});
