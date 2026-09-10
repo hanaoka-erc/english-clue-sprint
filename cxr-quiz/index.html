@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>健診胸部X線｜専門家BBox 品質確認10問</title>
+<style>
+:root{
+  --bg:#071015;--panel:#101b22;--line:#29404b;--text:#edf7fa;--muted:#9fb3bc;
+  --accent:#58d1bd;--accent2:#9be9dc;--danger:#ff4f5e;--gold:#ffe18a;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans JP",sans-serif}
+body{min-height:100vh}
+.wrap{max-width:960px;margin:auto;padding:18px 16px 42px}
+header{display:flex;justify-content:space-between;gap:16px;align-items:flex-end;margin-bottom:12px}
+h1{font-size:clamp(22px,4vw,30px);margin:0}
+.sub{color:var(--muted);font-size:13px;margin-top:6px}
+.badge{display:inline-block;margin-top:8px;border:1px solid #39756d;border-radius:999px;padding:5px 9px;color:var(--accent2);font-size:11px}
+.progress{font-weight:800;color:var(--accent2);white-space:nowrap}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:18px;overflow:hidden}
+.viewer{background:#000;min-height:58vh;display:flex;align-items:center;justify-content:center;padding:8px;position:relative}
+.stage{position:relative;display:inline-block;max-width:100%;line-height:0}
+#xray{display:block;max-width:100%;max-height:70vh;width:auto;height:auto}
+#bbox{position:absolute;inset:0;width:100%;height:100%;display:none;pointer-events:none}
+#bbox.show{display:block}
+.loading{position:absolute;color:#9eb1b8;font-size:13px}
+.controls{padding:15px}
+.prompt{font-weight:800;margin:0 0 12px}
+.answer{display:none;background:#16242d;border:1px solid #34515e;border-radius:14px;padding:14px;line-height:1.65;margin-bottom:12px}
+.answer.show{display:block}
+.key{font-size:20px;font-weight:900}
+.key span{color:var(--accent2)}
+.note{font-size:13px;color:#d8e6ea;margin-top:5px}
+.meta{font-size:11px;color:var(--muted);margin-top:8px}
+.buttons{display:flex;gap:10px}
+button{border:0;border-radius:13px;padding:14px 16px;font-size:16px;font-weight:900;cursor:pointer;flex:1}
+#reveal{background:var(--accent);color:#06251f}
+#next,#restart{display:none;background:#273a44;color:var(--text)}
+.foot{margin-top:13px;color:#91a5ae;font-size:11px;line-height:1.6}
+.legend{display:none;position:absolute;left:14px;top:14px;background:rgba(0,0,0,.72);border:1px solid rgba(255,79,94,.7);border-radius:8px;padding:6px 8px;color:#fff;font-size:11px;line-height:1.3}
+.legend.show{display:block}
+@media(max-width:600px){
+ .wrap{padding:10px 8px 28px}.viewer{min-height:60vh}.buttons{flex-direction:column}
+ header{align-items:flex-start}.progress{padding-top:4px}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+ <div>
+  <h1>健診胸部X線｜品質確認10問</h1>
+  <div class="sub">画像を読影 → 1タップで解答＋専門家アノテーションを表示</div>
+  <div class="badge">位置情報：NIH ChestX-ray8 / board-certified radiologist BBox</div>
+ </div>
+ <div class="progress" id="progress">1 / 10</div>
+</header>
+
+<section class="card">
+ <div class="viewer">
+   <div class="loading" id="loading">画像を読み込み中…</div>
+   <div class="stage">
+     <img id="xray" alt="胸部X線">
+     <svg id="bbox" viewBox="0 0 1024 1024" preserveAspectRatio="none"></svg>
+   </div>
+   <div class="legend" id="legend">赤枠＝専門家BBox<br>病変輪郭そのものではありません</div>
+ </div>
+ <div class="controls">
+   <p class="prompt">健診で所見を付けるなら？</p>
+   <div class="answer" id="answer"></div>
+   <div class="buttons">
+     <button id="reveal">答えを見る</button>
+     <button id="next">次の画像 →</button>
+     <button id="restart">もう一度（再シャッフル）</button>
+   </div>
+ </div>
+</section>
+
+<div class="foot">
+この10問は「位置マーキングの品質確認」を目的とした試作です。正常例はまだ入れていません。
+赤枠はGPTが画像を見て推定したものではなく、ChestX-ray8公開BBoxデータの座標をそのまま描画しています。
+元データでは、board-certified radiologist が指定された疾患インスタンスを画像上で同定しBBoxを付与しています。
+画像：NIH Clinical Center ChestX-ray8。公開ミラー：DataGym。教育目的で使用。
+</div>
+</div>
+
+<script>
+const IMAGE_BASE = "https://media.datagym.ai/blog/chestxray/images/";
+
+const master = [
+ {file:"00014716_007.png", label:"Atelectasis", jp:"無気肺", finding:"無気肺", box:[686.101694915254,131.543498411017,185.491525423729,313.491525423729],
+  tip:"容量減少、裂の偏位、横隔膜・肺門の牽引なども合わせて確認。"},
+ {file:"00021443_000.png", label:"Cardiomegaly", jp:"心拡大", finding:"心拡大", box:[286.069841269841,372.757671957672,545.049735449736,415.017989417989],
+  tip:"PA立位なら心胸郭比も参考にする。撮影条件による見かけの拡大には注意。"},
+ {file:"00027875_005.png", label:"Effusion", jp:"胸水", finding:"胸水", box:[696.753439153439,313.159788359788,266.565079365079,402.014814814815],
+  tip:"CP angleの鈍化、meniscus、下肺野の透過性低下を見る。"},
+ {file:"00005089_040.png", label:"Effusion", jp:"胸水", finding:"胸水", box:[618.734391534392,98.6074074074074,250.311111111111,679.415873015873],
+  tip:"胸水は量・体位によって見え方が大きく変わる。左右差を必ず比較する。"},
+ {file:"00026194_010.png", label:"Infiltrate", jp:"浸潤影", finding:"肺野浸潤影／異常陰影", box:[312.076190476191,107.27619047619,152.787301587302,149.536507936508],
+  tip:"健診では原因を断定しすぎず、限局性の透過性低下として拾い要精査につなげる。"},
+ {file:"00011151_004.png", label:"Mass", jp:"腫瘤影", finding:"肺野腫瘤影", box:[331.662222222222,207.397934027778,375.466666666667,365.226666666667],
+  tip:"肺癌かどうかの確定ではなく、腫瘤性陰影を見逃さずCT評価につなげるのが第一。"},
+ {file:"00021374_000.png", label:"Nodule", jp:"結節影", finding:"肺野結節影", box:[746.598941798942,377.092063492064,121.362962962963,105.108994708995],
+  tip:"血管・肋骨・乳頭陰影との重なりを意識し、左右比較と過去画像比較を行う。"},
+ {file:"00000150_002.png", label:"Pneumonia", jp:"肺炎を示唆する陰影", finding:"肺野浸潤影／異常陰影", box:[601.396825396825,595.978835978836,215.635978835979,180.960846560847],
+  tip:"健診画像だけで肺炎と決め打ちせず、浸潤影として症状・診察・追加画像へつなげる。"},
+ {file:"00027278_007.png", label:"Pneumothorax", jp:"気胸", finding:"気胸", box:[153.870899470899,47.6783068783069,310.992592592593,277.401058201058],
+  tip:"臓側胸膜線と、その末梢で肺血管影が消失している領域を探す。見逃し厳禁。"},
+ {file:"00002176_007.png", label:"Pneumothorax", jp:"気胸", finding:"気胸", box:[258.979894179894,188.546031746032,107.27619047619,115.944973544974],
+  tip:"小さい気胸は肺尖部や胸壁近傍を意識して系統的に見る。"}
+];
+
+function shuffle(a){
+ const x=[...a];
+ for(let i=x.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[x[i],x[j]]=[x[j],x[i]];}
+ return x;
+}
+let cases=shuffle(master), idx=0, shown=false;
+
+const img=document.getElementById("xray");
+const svg=document.getElementById("bbox");
+const ans=document.getElementById("answer");
+const prog=document.getElementById("progress");
+const loading=document.getElementById("loading");
+const legend=document.getElementById("legend");
+const reveal=document.getElementById("reveal");
+const next=document.getElementById("next");
+const restart=document.getElementById("restart");
+
+function render(){
+ const c=cases[idx]; shown=false;
+ prog.textContent=`${idx+1} / ${cases.length}`;
+ ans.className="answer"; ans.innerHTML="";
+ svg.classList.remove("show"); svg.innerHTML="";
+ legend.classList.remove("show");
+ reveal.style.display="block"; next.style.display="none"; restart.style.display="none";
+ loading.style.display="block"; loading.textContent="画像を読み込み中…";
+ img.style.opacity="0";
+ img.src=IMAGE_BASE+c.file;
+ img.onload=()=>{loading.style.display="none";img.style.opacity="1";};
+ img.onerror=()=>{loading.textContent="画像を取得できませんでした。ページを再読み込みしてください。";};
+}
+function showBox(c){
+ const [x,y,w,h]=c.box;
+ svg.innerHTML=`
+   <rect x="${x}" y="${y}" width="${w}" height="${h}"
+    fill="none" stroke="#ff4f5e" stroke-width="7"
+    vector-effect="non-scaling-stroke"/>
+ `;
+ svg.classList.add("show"); legend.classList.add("show");
+}
+function showAnswer(){
+ if(shown)return; shown=true;
+ const c=cases[idx]; showBox(c);
+ ans.innerHTML=`
+   <div class="key"><span>所見：</span>${c.finding}</div>
+   <div class="note"><b>専門家ラベル：</b>${c.label}（${c.jp}）</div>
+   <div class="note"><b>見るポイント：</b>${c.tip}</div>
+   <div class="meta">画像ID ${c.file} ／ 赤枠は公開BBox座標を無加工で表示</div>`;
+ ans.className="answer show";
+ reveal.style.display="none";
+ if(idx<cases.length-1) next.style.display="block"; else restart.style.display="block";
+}
+reveal.onclick=showAnswer;
+next.onclick=()=>{idx++;render()};
+restart.onclick=()=>{cases=shuffle(master);idx=0;render()};
+document.addEventListener("keydown",e=>{
+ if(e.code==="Space"){e.preventDefault();showAnswer()}
+ if(e.key==="ArrowRight"&&shown&&idx<cases.length-1){idx++;render()}
+});
+render();
+</script>
+</body>
+</html>
